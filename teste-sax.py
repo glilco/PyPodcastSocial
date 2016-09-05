@@ -1,10 +1,9 @@
 #!/usr/bin/python
 
 import xml.sax
-import urlparse
-import httplib
 import urllib2
 import socket
+import threading
 
 class StopSaxException(Exception):
     def __init__(self, value):
@@ -45,6 +44,7 @@ class PodcastHandler(xml.sax.ContentHandler):
     def __init__(self):
         self.CurrentTag = ""
         self.podcast = Podcast()
+        self.salvarPodcast = True
     
     def startElement(self, tag, attributes):
         self.CurrentTag=tag;
@@ -71,6 +71,32 @@ class PodcastHandler(xml.sax.ContentHandler):
     def endElement(self, tag):
         self.CurrentTag=""
 
+
+def handlePodcastUrl(podcastHandler, url):
+    parser = xml.sax.make_parser()
+    parser.setFeature(xml.sax.handler.feature_namespaces, 0)
+    parser.setContentHandler(podcastHandler)
+    
+           
+    try:
+        #print "url: ", url
+        parser.parse(opener.open(url))
+    except xml.sax.SAXParseException, e:
+        podcastHandler.salvarPodcast=False
+        print "SAXParseException:", e
+    except IOError as ioe:
+        podcastHandler.salvarPodcast=False
+        print "IOError:", url, "ERRO:", ioe
+    except NotXMLException:
+        podcastHandler.salvarPodcast=False
+        print "NotXMLException:", url
+    except StopSaxException:
+        pass
+    except Exception:
+        podcastHandler.salvarPodcast=False
+    
+    podcastHandler.podcast.feedUrl = url
+    
                 
 if ( __name__ == "__main__"):
     
@@ -89,47 +115,36 @@ if ( __name__ == "__main__"):
     opener = urllib2.build_opener()
     opener.addheaders = [('User-agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; it; rv:1.8.1.11) Gecko/20071127 Firefox/2.0.0.11')]
     
+    podcastHandlers = []
+    podThreads = []
+    
     for url in opmlHandler.urls:
-        parser = xml.sax.make_parser()
-        parser.setFeature(xml.sax.handler.feature_namespaces, 0)
-        
         podcastHandler = PodcastHandler()
-        parser.setContentHandler(podcastHandler)
+        podcastHandlers.append(podcastHandler)
 
+        podThreads.append(threading.Thread(target=handlePodcastUrl, args=(podcastHandler, url)))
         
-        salvarPodcast = True
-        
-        try:
-            #print "url: ", url
-            parser.parse(opener.open(url))
-        except xml.sax.SAXParseException, e:
-            salvarPodcast=False
-            print "SAXParseException:", e
-        except IOError as ioe:
-            salvarPodcast=False
-            print "IOError:", url, "ERRO:", ioe
-        except NotXMLException:
-            salvarPodcast=False
-            print "NotXMLException:", url
-        except StopSaxException:
-            pass
-        except Exception:
-            salvarPodcast=False
+    
+    for t in podThreads:
+        t.start()
+    
+    for t in podThreads:
+        t.join()
             
         
-        if salvarPodcast:
+    for podcastHandler in podcastHandlers:
+        if podcastHandler.salvarPodcast:
             podcast = podcastHandler.podcast
-            podcast.feedUrl = url
-            podcasts.append(podcast)
+            podcasts.append(podcast)    
         
-    '''    
+        
     for podcast in podcasts:
         print "Nome:", podcast.nome
         print "Descricao:", podcast.descricao
         print "Feed:", podcast.feedUrl
         print "Imagem:", podcast.imgUrl
         print "\n"
-    '''    
+        
     print "Podcasts regisgrados", len(podcasts)
     
         
