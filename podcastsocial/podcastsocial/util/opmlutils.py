@@ -5,7 +5,7 @@ import urllib2
 import socket
 import threading
 
-class StopSaxException(Exception):
+class StopSaxHandlerException(Exception):
     def __init__(self, value):
         self.value = value
     def __str__(self):
@@ -34,7 +34,7 @@ class OPMLHandler(xml.sax.ContentHandler):
         
     def startElement(self, tag, attributes):
         if tag == "outline":
-            urlString = attributes["xmlUrl"];
+            urlString = attributes.get("xmlUrl", "");
             if urlString:
                 self.urls.append(urlString);
                 
@@ -53,7 +53,7 @@ class PodcastHandler(xml.sax.ContentHandler):
             self.podcast.imgUrl=attributes["href"];
         
         elif tag == "item":
-            raise StopSaxException("Todos os dados carregados")
+            raise StopSaxHandlerException("Todos os dados carregados")
             
         elif tag == "html":
             raise NotXMLException("Arquivo esta em HTML")
@@ -90,7 +90,7 @@ def handlePodcastUrl(podcastHandler, url):
     except NotXMLException:
         podcastHandler.salvarPodcast=False
         print "NotXMLException:", url
-    except StopSaxException:
+    except StopSaxHandlerException:
         pass
     except Exception:
         podcastHandler.salvarPodcast=False
@@ -108,7 +108,7 @@ if ( __name__ == "__main__"):
     
     opmlHandler = OPMLHandler()
     parser.setContentHandler(opmlHandler)
-    parser.parse("/home/murilo/Dropbox/podkicker_backup.opml");
+    parser.parse("/home/glilco/Dropbox/podcasts_opml.xml");
     
     podcasts = [];
     
@@ -144,8 +144,9 @@ if ( __name__ == "__main__"):
         print "Feed:", podcast.feedUrl
         print "Imagem:", podcast.imgUrl
         print "\n"
-        
-    print "Podcasts regisgrados", len(podcasts)
+
+
+    print "Podcasts registrados", len(podcasts)
     
         
     
